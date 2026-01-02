@@ -46,15 +46,19 @@ namespace MiniBank.Api.Data
             {
                 new IdentityRole
                 {
+                    Id = "1", // Fixed ID
                     Name = "User",
-                    NormalizedName = "USER"
+                    NormalizedName = "USER",
+                    ConcurrencyStamp = "1"
                 },
                 new IdentityRole
                 {
+                    Id = "2", // Fixed ID
                     Name = "Admin",
-                    NormalizedName = "ADMIN"
+                    NormalizedName = "ADMIN",
+                    ConcurrencyStamp = "2"
                 }
-            };
+                };
             modelBuilder.Entity<IdentityRole>().HasData(roles);
            
         }

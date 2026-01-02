@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,39 +13,68 @@ namespace MiniBank.Api.Repository
     public class TransactionRepository : ITransactionRepository
     {
         private readonly ApplicationDBContext _context;
+
         public TransactionRepository(ApplicationDBContext context)
         {
             _context = context;
         }
 
-        public Task<Transaction> CreateAsync(Transaction transaction)
+        public async Task<Transaction?> GetByIdAsync(int id)
         {
-            throw new NotImplementedException();
+            return await _context.Transactions
+                .Include(t => t.FromAccount)
+                .Include(t => t.ToAccount)
+                .FirstOrDefaultAsync(t => t.id == id);
         }
 
-        public Task<List<Transaction>> GetAllAsync()
+        public async Task<List<Transaction>> GetByAccountIdAsync(int accountId)
         {
-            throw new NotImplementedException();
+            return await _context.Transactions
+                .Include(t => t.FromAccount)
+                .Include(t => t.ToAccount)
+                .Where(t => t.FromAccountId == accountId || t.ToAccountId == accountId)
+                .OrderByDescending(t => t.TransactionDate)
+                .ToListAsync();
         }
 
-        public Task<List<Transaction>> GetByAccountIdAsync(int accountId)
+        public async Task<List<Transaction>> GetByDateRangeAsync(int accountId, DateTime startDate, DateTime endDate)
         {
-            throw new NotImplementedException();
+            return await _context.Transactions
+                .Include(t => t.FromAccount)
+                .Include(t => t.ToAccount)
+                .Where(t => (t.FromAccountId == accountId || t.ToAccountId == accountId) 
+                    && t.TransactionDate >= startDate 
+                    && t.TransactionDate <= endDate)
+                .OrderByDescending(t => t.TransactionDate)
+                .ToListAsync();
         }
 
-        public Task<List<Transaction>> GetByDateRangeAsync(int accountId, DateTime startDate, DateTime endDate)
+        public async Task<Transaction> CreateAsync(Transaction transaction)
         {
-            throw new NotImplementedException();
+            await _context.Transactions.AddAsync(transaction);
+            await _context.SaveChangesAsync();
+            return transaction;
         }
 
-        public Task<Transaction?> GetByIdAsync(int id)
+        public async Task<Transaction?> UpdateStatusAsync(int id, string status)
         {
-            throw new NotImplementedException();
+            var transaction = await _context.Transactions.FindAsync(id);
+            if (transaction == null)
+                return null;
+
+            transaction.Status = status;
+            transaction.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return transaction;
         }
 
-        public Task<Transaction?> UpdateStatusAsync(int id, string status)
+        public async Task<List<Transaction>> GetAllAsync()
         {
-            throw new NotImplementedException();
+            return await _context.Transactions
+                .Include(t => t.FromAccount)
+                .Include(t => t.ToAccount)
+                .OrderByDescending(t => t.TransactionDate)
+                .ToListAsync();
         }
     }
 }

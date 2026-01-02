@@ -9,54 +9,80 @@ using MiniBank.Api.Data;
 
 namespace MiniBank.Api.Repository
 {
-    public class AccountRepository: IAccountRepository
+    public class AccountRepository : IAccountRepository
     {
-       private readonly ApplicationDBContext _context;
+        private readonly ApplicationDBContext _context;
 
         public AccountRepository(ApplicationDBContext context)
         {
             _context = context;
         }
 
-        public Task<Account?> GetByIdAsync(int id)
+        public async Task<Account?> GetByIdAsync(int id)
         {
-            throw new NotImplementedException();
+            return await _context.Accounts
+                .Include(a => a.User)
+                .FirstOrDefaultAsync(a => a.Id == id);
         }
 
-        public Task<Account?> GetByAccountNumberAsync(string accountNumber)
+        public async Task<Account?> GetByAccountNumberAsync(string accountNumber)
         {
-            throw new NotImplementedException();
+            return await _context.Accounts
+                .Include(a => a.User)
+                .FirstOrDefaultAsync(a => a.AccountNumber == accountNumber);
         }
 
-        public Task<List<Account>> GetByUserIdAsync(string userId)
+        public async Task<List<Account>> GetByUserIdAsync(string userId)
         {
-            throw new NotImplementedException();
+            return await _context.Accounts
+                .Where(a => a.UserId == userId)
+                .OrderByDescending(a => a.CreatedAt)
+                .ToListAsync();
         }
 
-        public Task<Account> CreateAsync(Account account)
+        public async Task<Account> CreateAsync(Account account)
         {
-            throw new NotImplementedException();
+            await _context.Accounts.AddAsync(account);
+            await _context.SaveChangesAsync();
+            return account;
         }
 
-        public Task<Account?> UpdateAsync(int id, Account account)
+        public async Task<Account?> UpdateAsync(int id, Account account)
         {
-            throw new NotImplementedException();
+            var existingAccount = await _context.Accounts.FindAsync(id);
+            if (existingAccount == null)
+                return null;
+
+            existingAccount.Balance = account.Balance;
+            existingAccount.AccountType = account.AccountType;
+            existingAccount.Currency = account.Currency;
+            existingAccount.IsActive = account.IsActive;
+            existingAccount.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return existingAccount;
         }
 
-        public Task<Account?> DeleteAsync(int id)
+        public async Task<Account?> DeleteAsync(int id)
         {
-            throw new NotImplementedException();
+            var account = await _context.Accounts.FindAsync(id);
+            if (account == null)
+                return null;
+
+            _context.Accounts.Remove(account);
+            await _context.SaveChangesAsync();
+            return account;
         }
 
-        public Task<bool> AccountExistsAsync(string accountNumber)
+        public async Task<bool> AccountExistsAsync(string accountNumber)
         {
-            throw new NotImplementedException();
+            return await _context.Accounts.AnyAsync(a => a.AccountNumber == accountNumber);
         }
 
-        public Task<decimal> GetBalanceAsync(int accountId)
+        public async Task<decimal> GetBalanceAsync(int accountId)
         {
-            throw new NotImplementedException();
+            var account = await _context.Accounts.FindAsync(accountId);
+            return account?.Balance ?? 0;
         }
-        
     }
 }
