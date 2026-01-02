@@ -2,6 +2,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+# Install EF Core tools
+RUN dotnet tool install --global dotnet-ef
+ENV PATH="${PATH}:/root/.dotnet/tools"
+
 # Copy solution and project files
 COPY ["MiniBank.sln", "./"]
 COPY ["MiniBank.Api/MiniBank.Api.csproj", "MiniBank.Api/"]
@@ -23,6 +27,10 @@ RUN dotnet publish "MiniBank.Api.csproj" -c Release -o /app/publish /p:UseAppHos
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+
+# Install EF Core tools for migrations
+RUN dotnet tool install --global dotnet-ef --version 9.*
+ENV PATH="${PATH}:/root/.dotnet/tools"
 
 # Copy published files
 COPY --from=build /app/publish .

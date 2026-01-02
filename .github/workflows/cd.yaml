@@ -70,7 +70,9 @@ jobs:
 
             - name: Create namespace if not exists
               run: |
-                  kubectl get namespace ${{ env.K8S_NAMESPACE }} || kubectl apply -f k8s/00-namespace.yaml
+                  echo "Creating namespace..."
+                  kubectl apply -f k8s/00-namespace.yaml
+                  kubectl get namespace ${{ env.K8S_NAMESPACE }}
 
             - name: Deploy ConfigMap
               run: kubectl apply -f k8s/01-configmap.yaml
@@ -84,29 +86,29 @@ jobs:
                   echo "Waiting for SQL Server to be ready..."
                   kubectl wait --for=condition=ready pod -l app=sqlserver -n ${{ env.K8S_NAMESPACE }} --timeout=300s || true
 
-            - name: Run Database Migrations
-              run: |
-                  # Delete old migration job if exists
-                  kubectl delete job minibank-migration -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
+            # - name: Run Database Migrations
+            #   run: |
+            #       # Delete old migration job if exists
+            #       kubectl delete job minibank-migration -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
 
-                  # Update migration job with correct image
-                  sed -i "s|grahamkatana/minibank-api:latest|${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}|g" k8s/06-migration-job.yaml
+            #       # Update migration job with correct image
+            #       sed -i "s|grahamkatana/minibank-api:latest|${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}|g" k8s/06-migration-job.yaml
 
-                  # Apply migration job
-                  kubectl apply -f k8s/06-migration-job.yaml
+            #       # Apply migration job
+            #       kubectl apply -f k8s/06-migration-job.yaml
 
-                  # Wait for migration to complete
-                  echo "Running database migrations..."
-                  kubectl wait --for=condition=complete job/minibank-migration -n ${{ env.K8S_NAMESPACE }} --timeout=180s
+            #       # Wait for migration to complete
+            #       echo "Running database migrations..."
+            #       kubectl wait --for=condition=complete job/minibank-migration -n ${{ env.K8S_NAMESPACE }} --timeout=180s
 
-                  # Check migration status
-                  if [ $? -eq 0 ]; then
-                    echo "✓ Database migrations completed successfully"
-                  else
-                    echo "✗ Migration failed. Check logs:"
-                    kubectl logs job/minibank-migration -n ${{ env.K8S_NAMESPACE }}
-                    exit 1
-                  fi
+            #       # Check migration status
+            #       if [ $? -eq 0 ]; then
+            #         echo "✓ Database migrations completed successfully"
+            #       else
+            #         echo "✗ Migration failed. Check logs:"
+            #         kubectl logs job/minibank-migration -n ${{ env.K8S_NAMESPACE }}
+            #         exit 1
+            #       fi
 
             - name: Deploy API
               run: |
