@@ -4,22 +4,23 @@ metadata:
   name: minibank-ingress
   namespace: minibank
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - minibank.tekbridge.co.za  # ← Changed
-    secretName: minibank-tls
+  ingressClassName: traefik
   rules:
-  - host: minibank.tekbridge.co.za  # ← Changed
+  - host: minibank.tekbridge.co.za
     http:
       paths:
-      - path: /
-        pathType: Prefix
-        backend:
+      - backend:
           service:
             name: minibank-api-service
             port:
               number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - minibank.tekbridge.co.za
+    secretName: minibank-tls
