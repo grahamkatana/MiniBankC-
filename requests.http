@@ -1,0 +1,178 @@
+### Variables
+@baseUrl = http://localhost:5000
+@token = YOUR_TOKEN_HERE
+
+### ============================================
+### AUTHENTICATION
+### ============================================
+
+### Register new user
+POST {{baseUrl}}/api/authentication/register
+Content-Type: application/json
+
+{
+  "username": "graham",
+  "email": "graham@example.com",
+  "password": "Password@123"
+}
+
+### Login
+POST {{baseUrl}}/api/authentication/login
+Content-Type: application/json
+
+{
+  "email": "graham@example.com",
+  "password": "Password@123"
+}
+
+### ============================================
+### ACCOUNTS
+### ============================================
+
+### Get all user accounts
+GET {{baseUrl}}/api/account
+Authorization: Bearer {{token}}
+
+### Get account by ID
+GET {{baseUrl}}/api/account/1
+Authorization: Bearer {{token}}
+
+### Get account by account number
+GET {{baseUrl}}/api/account/number/ACC-20260102-1234
+Authorization: Bearer {{token}}
+
+### Get account balance
+GET {{baseUrl}}/api/account/balance/ACC-20260102-1234
+Authorization: Bearer {{token}}
+
+### Create new account
+POST {{baseUrl}}/api/account
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userId": "YOUR_USER_ID_HERE",
+  "accountType": "Checking",
+  "currency": "ZAR"
+}
+
+### Update account
+PUT {{baseUrl}}/api/account/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "accountType": "Savings",
+  "isActive": true
+}
+
+### Delete account
+DELETE {{baseUrl}}/api/account/1
+Authorization: Bearer {{token}}
+
+### ============================================
+### TRANSACTIONS
+### ============================================
+
+### Get transaction by ID
+GET {{baseUrl}}/api/transaction/1
+Authorization: Bearer {{token}}
+
+### Get all transactions for account
+GET {{baseUrl}}/api/transaction/account/ACC-20260102-1234
+Authorization: Bearer {{token}}
+
+### Get transactions by date range
+GET {{baseUrl}}/api/transaction/account/ACC-20260102-1234/range?startDate=2026-01-01&endDate=2026-12-31
+Authorization: Bearer {{token}}
+
+### Deposit money
+POST {{baseUrl}}/api/transaction/deposit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "accountNumber": "ACC-20260102-1234",
+  "amount": 1000.00,
+  "description": "Initial deposit"
+}
+
+### Withdraw money
+POST {{baseUrl}}/api/transaction/withdraw
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "accountNumber": "ACC-20260102-1234",
+  "amount": 200.00,
+  "description": "ATM withdrawal"
+}
+
+### Transfer between accounts
+POST {{baseUrl}}/api/transaction/transfer
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fromAccountNumber": "ACC-20260102-1234",
+  "toAccountNumber": "ACC-20260102-5678",
+  "amount": 500.00,
+  "description": "Transfer to savings"
+}
+
+### Get all transactions (Admin only)
+GET {{baseUrl}}/api/transaction/all
+Authorization: Bearer {{token}}
+
+### ============================================
+### WORKFLOW EXAMPLE
+### ============================================
+
+### 1. Register User
+POST {{baseUrl}}/api/authentication/register
+Content-Type: application/json
+
+{
+  "username": "claude",
+  "email": "claude@example.com",
+  "password": "SecurePass@123"
+}
+
+### 2. Login (copy token from response)
+POST {{baseUrl}}/api/authentication/login
+Content-Type: application/json
+
+{
+  "email": "claude@example.com",
+  "password": "SecurePass@123"
+}
+
+### 3. Create Account (use userId from login response)
+POST {{baseUrl}}/api/account
+Authorization: Bearer YOUR_TOKEN_FROM_STEP_2
+Content-Type: application/json
+
+{
+  "userId": "USER_ID_FROM_STEP_2",
+  "accountType": "Checking",
+  "currency": "ZAR"
+}
+
+### 4. Deposit Money (use accountNumber from step 3)
+POST {{baseUrl}}/api/transaction/deposit
+Authorization: Bearer YOUR_TOKEN_FROM_STEP_2
+Content-Type: application/json
+
+{
+  "accountNumber": "ACCOUNT_NUMBER_FROM_STEP_3",
+  "amount": 5000.00,
+  "description": "Initial deposit"
+}
+
+### 5. Check Balance
+GET {{baseUrl}}/api/account/balance/ACCOUNT_NUMBER_FROM_STEP_3
+Authorization: Bearer YOUR_TOKEN_FROM_STEP_2
+
+### 6. View Transactions
+GET {{baseUrl}}/api/transaction/account/ACCOUNT_NUMBER_FROM_STEP_3
+Authorization: Bearer YOUR_TOKEN_FROM_STEP_2

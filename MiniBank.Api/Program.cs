@@ -63,13 +63,12 @@ builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
 var app = builder.Build();
+app.MapGet("/", () => Results.Redirect("/swagger"));
 
-// ADD THESE - MIDDLEWARE
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+
+app.UseSwagger();
+app.UseSwaggerUI();
+
 
 app.UseHttpsRedirection();
 
