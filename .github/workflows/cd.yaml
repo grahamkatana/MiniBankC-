@@ -1,0 +1,169 @@
+name: CD - Deploy to Kubernetes
+
+on:
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: "Environment to deploy to"
+                required: true
+                default: "production"
+                type: choice
+                options:
+                    - production
+                    - staging
+            image-tag:
+                description: "Docker image tag to deploy (leave empty for latest)"
+                required: false
+                default: "latest"
+    workflow_run:
+        workflows: ["CI - Test and Build"]
+        types:
+            - completed
+        branches:
+            - main
+
+env:
+    DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+    IMAGE_NAME: minibank-api
+    K8S_NAMESPACE: minibank
+
+jobs:
+    deploy:
+        name: Deploy to Kubernetes
+        runs-on: ubuntu-latest
+        if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set image tag
+              id: set-tag
+              run: |
+                  if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+                    echo "IMAGE_TAG=${{ github.event.inputs.image-tag }}" >> $GITHUB_ENV
+                  else
+                    echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+                  fi
+
+            - name: Install kubectl
+              uses: azure/setup-kubectl@v3
+              with:
+                  version: "latest"
+
+            - name: Configure kubectl
+              run: |
+                  mkdir -p $HOME/.kube
+                  cat << 'EOF' > $HOME/.kube/config
+                  ${{ secrets.KUBE_CONFIG }}
+                  EOF
+                  chmod 600 $HOME/.kube/config
+
+            - name: Verify cluster connection
+              run: |
+                  kubectl cluster-info
+                  kubectl get nodes
+
+            - name: Update image in deployment
+              run: |
+                  sed -i "s|grahamkatana/minibank-api:latest|${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}|g" k8s/04-api.yaml
+
+            - name: Create namespace if not exists
+              run: |
+                  kubectl get namespace ${{ env.K8S_NAMESPACE }} || kubectl apply -f k8s/00-namespace.yaml
+
+            - name: Deploy ConfigMap
+              run: kubectl apply -f k8s/01-configmap.yaml
+
+            - name: Deploy Secrets
+              run: kubectl apply -f k8s/02-secret.yaml
+
+            - name: Deploy SQL Server
+              run: |
+                  kubectl apply -f k8s/03-sqlserver.yaml
+                  echo "Waiting for SQL Server to be ready..."
+                  kubectl wait --for=condition=ready pod -l app=sqlserver -n ${{ env.K8S_NAMESPACE }} --timeout=300s || true
+
+            - name: Run Database Migrations
+              run: |
+                  # Delete old migration job if exists
+                  kubectl delete job minibank-migration -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
+
+                  # Update migration job with correct image
+                  sed -i "s|grahamkatana/minibank-api:latest|${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}|g" k8s/06-migration-job.yaml
+
+                  # Apply migration job
+                  kubectl apply -f k8s/06-migration-job.yaml
+
+                  # Wait for migration to complete
+                  echo "Running database migrations..."
+                  kubectl wait --for=condition=complete job/minibank-migration -n ${{ env.K8S_NAMESPACE }} --timeout=180s
+
+                  # Check migration status
+                  if [ $? -eq 0 ]; then
+                    echo "✓ Database migrations completed successfully"
+                  else
+                    echo "✗ Migration failed. Check logs:"
+                    kubectl logs job/minibank-migration -n ${{ env.K8S_NAMESPACE }}
+                    exit 1
+                  fi
+
+            - name: Deploy API
+              run: |
+                  kubectl apply -f k8s/04-api.yaml
+                  echo "Waiting for API deployment to be ready..."
+                  kubectl rollout status deployment/minibank-api -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+
+            - name: Verify deployment
+              run: |
+                  echo "=== Pods ==="
+                  kubectl get pods -n ${{ env.K8S_NAMESPACE }}
+
+                  echo ""
+                  echo "=== Services ==="
+                  kubectl get svc -n ${{ env.K8S_NAMESPACE }}
+
+                  echo ""
+                  echo "=== Deployments ==="
+                  kubectl get deployments -n ${{ env.K8S_NAMESPACE }}
+
+            - name: Get service URL
+              id: get-url
+              run: |
+                  EXTERNAL_IP=$(kubectl get svc minibank-api-service -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+                  if [ -z "$EXTERNAL_IP" ]; then
+                    EXTERNAL_IP=$(kubectl get svc minibank-api-service -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                  fi
+                  echo "EXTERNAL_IP=$EXTERNAL_IP" >> $GITHUB_OUTPUT
+                  echo "API_URL=http://$EXTERNAL_IP" >> $GITHUB_OUTPUT
+
+            - name: Deployment Summary
+              run: |
+                  echo "### Deployment Successful! 🚀" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Environment:** ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+                  echo "**Image Tag:** ${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+                  echo "**Namespace:** ${{ env.K8S_NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**API URL:** ${{ steps.get-url.outputs.API_URL }}" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Useful Commands:**" >> $GITHUB_STEP_SUMMARY
+                  echo '```bash' >> $GITHUB_STEP_SUMMARY
+                  echo "kubectl get pods -n ${{ env.K8S_NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+                  echo "kubectl logs -f deployment/minibank-api -n ${{ env.K8S_NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+                  echo "kubectl get svc -n ${{ env.K8S_NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+                  echo '```' >> $GITHUB_STEP_SUMMARY
+
+            - name: Notify on failure
+              if: failure()
+              run: |
+                  echo "### Deployment Failed ❌" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Debug Commands:**" >> $GITHUB_STEP_SUMMARY
+                  echo '```bash' >> $GITHUB_STEP_SUMMARY
+                  echo "kubectl describe deployment minibank-api -n ${{ env.K8S_NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+                  echo "kubectl logs deployment/minibank-api -n ${{ env.K8S_NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+                  echo "kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by='.lastTimestamp'" >> $GITHUB_STEP_SUMMARY
+                  echo '```' >> $GITHUB_STEP_SUMMARY

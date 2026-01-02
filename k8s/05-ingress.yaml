@@ -10,10 +10,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - minibank.yourdomain.com
+    - minibank.tekbridge.co.za  # ← Changed
     secretName: minibank-tls
   rules:
-  - host: minibank.yourdomain.com
+  - host: minibank.tekbridge.co.za  # ← Changed
     http:
       paths:
       - path: /
