@@ -1,9 +1,12 @@
 using MiniBank.Api.Data;
 using MiniBank.Api.Models;
+using MiniBank.Api.Interfaces;
+using MiniBank.Api.Repository;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MiniBank.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,7 +52,9 @@ builder.Services.AddAuthentication(options =>
 
     };
 });
-
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<ITransactionService, TransactionService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 
 
 var app = builder.Build();
