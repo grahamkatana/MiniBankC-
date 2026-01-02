@@ -10,6 +10,9 @@
     <Folder Include="Controllers/" />
     <Folder Include="Data/" />
     <Folder Include="Dtos/" />
+    <Folder Include="Dtos/Account/" />
+    <Folder Include="Dtos/Authentication/" />
+    <Folder Include="Dtos/Transaction/" />
     <Folder Include="Extensions/" />
     <Folder Include="Interfaces/" />
     <Folder Include="Models/" />
