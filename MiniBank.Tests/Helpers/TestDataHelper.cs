@@ -1,20 +1,22 @@
-// Helpers/TestDataHelper.cs
-using MiniBank.Api.Models;
 using MiniBank.Api.Dtos.Account;
 using MiniBank.Api.Dtos.Transaction;
+using MiniBank.Api.Models;
 
 namespace MiniBank.Tests.Helpers
 {
     public static class TestDataHelper
     {
-        public static AppUser CreateTestUser(string id = "test-user-id", string email = "test@example.com")
+        public static AppUser CreateTestUser(
+            string id = "test-user-id",
+            string email = "test@example.com"
+        )
         {
             return new AppUser
             {
                 Id = id,
                 UserName = "testuser",
                 Email = email,
-                EmailConfirmed = true
+                EmailConfirmed = true,
             };
         }
 
@@ -30,7 +32,14 @@ namespace MiniBank.Tests.Helpers
                 UserId = userId,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                UpdatedAt = DateTime.UtcNow,
+                User = new AppUser // Add this!
+                {
+                    Id = userId,
+                    UserName = "testuser",
+                    Email = "test@example.com",
+                    EmailConfirmed = true,
+                },
             };
         }
 
@@ -47,7 +56,7 @@ namespace MiniBank.Tests.Helpers
                 ToAccountId = accountId,
                 TransactionDate = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                UpdatedAt = DateTime.UtcNow,
             };
         }
 
@@ -57,7 +66,7 @@ namespace MiniBank.Tests.Helpers
             {
                 UserId = userId,
                 AccountType = "Checking",
-                Currency = "ZAR"
+                Currency = "ZAR",
             };
         }
 
@@ -67,7 +76,7 @@ namespace MiniBank.Tests.Helpers
             {
                 AccountNumber = accountNumber,
                 Amount = 500.00m,
-                Description = "Test deposit"
+                Description = "Test deposit",
             };
         }
 
@@ -77,18 +86,21 @@ namespace MiniBank.Tests.Helpers
             {
                 AccountNumber = accountNumber,
                 Amount = 200.00m,
-                Description = "Test withdrawal"
+                Description = "Test withdrawal",
             };
         }
 
-        public static TransferDto CreateTransferDto(string fromAccount = "ACC-20260102-0001", string toAccount = "ACC-20260102-0002")
+        public static TransferDto CreateTransferDto(
+            string fromAccount = "ACC-20260102-0001",
+            string toAccount = "ACC-20260102-0002"
+        )
         {
             return new TransferDto
             {
                 FromAccountNumber = fromAccount,
                 ToAccountNumber = toAccount,
                 Amount = 300.00m,
-                Description = "Test transfer"
+                Description = "Test transfer",
             };
         }
     }
