@@ -8,11 +8,31 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MiniBank.Api.Services;
 using MiniBank.Api.Hubs;
+using Hangfire;
+using Hangfire.SqlServer;
+using MiniBank.Api.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSignalR();
 
+builder.Services.AddHangfire(configuration => configuration
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        new SqlServerStorageOptions
+        {
+            CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+            SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+            QueuePollInterval = TimeSpan.Zero,
+            UseRecommendedIsolationLevel = true,
+            DisableGlobalLocks = true
+        })
+);
+builder.Services.AddHangfireServer();
+builder.Services.AddScoped<IBackgroundJobService, BackgroundJobService>();
 
 builder.Services.AddControllers().AddNewtonsoftJson(options =>
 {
@@ -81,6 +101,10 @@ app.UseSwaggerUI();
 
 
 app.UseHttpsRedirection();
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new HangfireAuthorizationFilter() }
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
