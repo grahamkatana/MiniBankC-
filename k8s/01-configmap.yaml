@@ -8,3 +8,7 @@ data:
   JWT__ISSUER: "https://minibank.tekbridge.co.za"
   JWT__AUDIENCE: "https://minibank.tekbridge.co.za"
   ASPNETCORE_URLS: "http://+:8080"
+  Email__SmtpHost: "smtp.gmail.com"
+  Email__SmtpPort: "587"
+  Email__FromName: "MiniBank"
+  Email__FromAddress: "your-email@gmail.com"
