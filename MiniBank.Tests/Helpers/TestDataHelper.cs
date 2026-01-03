@@ -20,6 +20,7 @@ namespace MiniBank.Tests.Helpers
             };
         }
 
+        // For Repository tests - NO User navigation property
         public static Account CreateTestAccount(string userId = "test-user-id", int id = 1)
         {
             return new Account
@@ -33,11 +34,32 @@ namespace MiniBank.Tests.Helpers
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-                User = new AppUser // Add this!
+            };
+        }
+
+        // For Service tests - WITH User navigation property
+        public static Account CreateTestAccountWithUser(
+            string userId = "test-user-id",
+            int id = 1,
+            string email = "test@example.com"
+        )
+        {
+            return new Account
+            {
+                Id = id,
+                AccountNumber = $"ACC-20260102-{id:D4}",
+                Balance = 1000.00m,
+                AccountType = "Checking",
+                Currency = "ZAR",
+                UserId = userId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                User = new AppUser
                 {
                     Id = userId,
                     UserName = "testuser",
-                    Email = "test@example.com",
+                    Email = email,
                     EmailConfirmed = true,
                 },
             };
