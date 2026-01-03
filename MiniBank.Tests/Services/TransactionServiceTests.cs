@@ -1,11 +1,10 @@
-// Services/TransactionServiceTests.cs
-using Moq;
-using Xunit;
 using FluentAssertions;
-using MiniBank.Api.Services;
 using MiniBank.Api.Interfaces;
 using MiniBank.Api.Models;
+using MiniBank.Api.Services;
 using MiniBank.Tests.Helpers;
+using Moq;
+using Xunit;
 
 namespace MiniBank.Tests.Services
 {
@@ -13,13 +12,23 @@ namespace MiniBank.Tests.Services
     {
         private readonly Mock<ITransactionRepository> _transactionRepoMock;
         private readonly Mock<IAccountRepository> _accountRepoMock;
+        private readonly Mock<IEmailService> _emailServiceMock; // Add this
+        private readonly Mock<INotificationService> _notificationServiceMock; // Add this
         private readonly TransactionService _transactionService;
 
         public TransactionServiceTests()
         {
             _transactionRepoMock = new Mock<ITransactionRepository>();
             _accountRepoMock = new Mock<IAccountRepository>();
-            _transactionService = new TransactionService(_transactionRepoMock.Object, _accountRepoMock.Object);
+            _emailServiceMock = new Mock<IEmailService>(); // Add this
+            _notificationServiceMock = new Mock<INotificationService>(); // Add this
+
+            _transactionService = new TransactionService(
+                _transactionRepoMock.Object,
+                _accountRepoMock.Object,
+                _emailServiceMock.Object, // Add this
+                _notificationServiceMock.Object // Add this
+            );
         }
 
         [Fact]
@@ -27,14 +36,14 @@ namespace MiniBank.Tests.Services
         {
             // Arrange
             var account = TestDataHelper.CreateTestAccount();
-            var depositDto = TestDataHelper.CreateDepositDto(account.AccountNumber);
+            var depositDto = TestDataHelper.CreateDepositDto();
             var initialBalance = account.Balance;
 
             _accountRepoMock
                 .Setup(x => x.GetByAccountNumberAsync(account.AccountNumber))
                 .ReturnsAsync(account);
             _accountRepoMock
-                .Setup(x => x.UpdateAsync(account.Id, It.IsAny<Account>()))
+                .Setup(x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<Account>()))
                 .ReturnsAsync(account);
             _transactionRepoMock
                 .Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
@@ -45,11 +54,35 @@ namespace MiniBank.Tests.Services
 
             // Assert
             result.Should().NotBeNull();
-            result.Amount.Should().Be(500.00m);
+            result.Amount.Should().Be(depositDto.Amount);
             result.TransactionType.Should().Be("Deposit");
             result.Status.Should().Be("Completed");
-            _accountRepoMock.Verify(x => x.UpdateAsync(account.Id, It.IsAny<Account>()), Times.Once);
+
+            _accountRepoMock.Verify(
+                x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<Account>()),
+                Times.Once
+            );
             _transactionRepoMock.Verify(x => x.CreateAsync(It.IsAny<Transaction>()), Times.Once);
+
+            // Verify email and notification were called (fire and forget, so just verify)
+            _emailServiceMock.Verify(
+                x =>
+                    x.SendTransactionNotificationAsync(
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<decimal>(),
+                        It.IsAny<string>()
+                    ),
+                Times.Once
+            );
+            _notificationServiceMock.Verify(
+                x => x.NotifyTransactionAsync(It.IsAny<string>(), It.IsAny<object>()),
+                Times.Once
+            );
+            _notificationServiceMock.Verify(
+                x => x.NotifyBalanceChangeAsync(It.IsAny<string>(), It.IsAny<decimal>()),
+                Times.Once
+            );
         }
 
         [Fact]
@@ -77,7 +110,7 @@ namespace MiniBank.Tests.Services
                 .Setup(x => x.GetByAccountNumberAsync(account.AccountNumber))
                 .ReturnsAsync(account);
             _accountRepoMock
-                .Setup(x => x.UpdateAsync(account.Id, It.IsAny<Account>()))
+                .Setup(x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<Account>()))
                 .ReturnsAsync(account);
             _transactionRepoMock
                 .Setup(x => x.CreateAsync(It.IsAny<Transaction>()))
@@ -88,9 +121,12 @@ namespace MiniBank.Tests.Services
 
             // Assert
             result.Should().NotBeNull();
-            result.Amount.Should().Be(200.00m);
+            result.Amount.Should().Be(withdrawDto.Amount);
             result.TransactionType.Should().Be("Withdrawal");
-            _accountRepoMock.Verify(x => x.UpdateAsync(account.Id, It.IsAny<Account>()), Times.Once);
+            _accountRepoMock.Verify(
+                x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<Account>()),
+                Times.Once
+            );
         }
 
         [Fact]
@@ -98,7 +134,7 @@ namespace MiniBank.Tests.Services
         {
             // Arrange
             var account = TestDataHelper.CreateTestAccount();
-            account.Balance = 100.00m; // Less than withdrawal amount
+            account.Balance = 100.00m;
             var withdrawDto = TestDataHelper.CreateWithdrawDto(account.AccountNumber);
 
             _accountRepoMock
@@ -106,7 +142,9 @@ namespace MiniBank.Tests.Services
                 .ReturnsAsync(account);
 
             // Act & Assert
-            var exception = await Assert.ThrowsAsync<Exception>(() => _transactionService.WithdrawAsync(withdrawDto));
+            var exception = await Assert.ThrowsAsync<Exception>(() =>
+                _transactionService.WithdrawAsync(withdrawDto)
+            );
             exception.Message.Should().Contain("Insufficient balance");
         }
 
@@ -118,7 +156,10 @@ namespace MiniBank.Tests.Services
             fromAccount.Balance = 1000.00m;
             var toAccount = TestDataHelper.CreateTestAccount("user2", 2);
             toAccount.Balance = 500.00m;
-            var transferDto = TestDataHelper.CreateTransferDto(fromAccount.AccountNumber, toAccount.AccountNumber);
+            var transferDto = TestDataHelper.CreateTransferDto(
+                fromAccount.AccountNumber,
+                toAccount.AccountNumber
+            );
 
             _accountRepoMock
                 .Setup(x => x.GetByAccountNumberAsync(fromAccount.AccountNumber))
@@ -142,7 +183,10 @@ namespace MiniBank.Tests.Services
             result.TransactionType.Should().Be("Transfer");
             result.FromAccountId.Should().Be(1);
             result.ToAccountId.Should().Be(2);
-            _accountRepoMock.Verify(x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<Account>()), Times.Exactly(2));
+            _accountRepoMock.Verify(
+                x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<Account>()),
+                Times.Exactly(2)
+            );
         }
 
         [Fact]
@@ -150,14 +194,19 @@ namespace MiniBank.Tests.Services
         {
             // Arrange
             var account = TestDataHelper.CreateTestAccount();
-            var transferDto = TestDataHelper.CreateTransferDto(account.AccountNumber, account.AccountNumber);
+            var transferDto = TestDataHelper.CreateTransferDto(
+                account.AccountNumber,
+                account.AccountNumber
+            );
 
             _accountRepoMock
                 .Setup(x => x.GetByAccountNumberAsync(account.AccountNumber))
                 .ReturnsAsync(account);
 
             // Act & Assert
-            var exception = await Assert.ThrowsAsync<Exception>(() => _transactionService.TransferAsync(transferDto));
+            var exception = await Assert.ThrowsAsync<Exception>(() =>
+                _transactionService.TransferAsync(transferDto)
+            );
             exception.Message.Should().Contain("Cannot transfer to the same account");
         }
 
@@ -166,9 +215,12 @@ namespace MiniBank.Tests.Services
         {
             // Arrange
             var fromAccount = TestDataHelper.CreateTestAccount("user1", 1);
-            fromAccount.Balance = 100.00m; // Less than transfer amount
+            fromAccount.Balance = 100.00m;
             var toAccount = TestDataHelper.CreateTestAccount("user2", 2);
-            var transferDto = TestDataHelper.CreateTransferDto(fromAccount.AccountNumber, toAccount.AccountNumber);
+            var transferDto = TestDataHelper.CreateTransferDto(
+                fromAccount.AccountNumber,
+                toAccount.AccountNumber
+            );
 
             _accountRepoMock
                 .Setup(x => x.GetByAccountNumberAsync(fromAccount.AccountNumber))
@@ -178,7 +230,9 @@ namespace MiniBank.Tests.Services
                 .ReturnsAsync(toAccount);
 
             // Act & Assert
-            var exception = await Assert.ThrowsAsync<Exception>(() => _transactionService.TransferAsync(transferDto));
+            var exception = await Assert.ThrowsAsync<Exception>(() =>
+                _transactionService.TransferAsync(transferDto)
+            );
             exception.Message.Should().Contain("Insufficient balance");
         }
 
@@ -190,7 +244,7 @@ namespace MiniBank.Tests.Services
             var transactions = new List<Transaction>
             {
                 TestDataHelper.CreateTestTransaction(account.Id, 1),
-                TestDataHelper.CreateTestTransaction(account.Id, 2)
+                TestDataHelper.CreateTestTransaction(account.Id, 2),
             };
 
             _accountRepoMock

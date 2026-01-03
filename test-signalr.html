@@ -37,7 +37,7 @@
             }
 
             connection = new signalR.HubConnectionBuilder()
-                .withUrl("https://minibank.tekbridge.co.za/hubs/transactions", {
+                .withUrl("http://localhost:5205/hubs/transactions", {
                     accessTokenFactory: () => token
                 })
                 .withAutomaticReconnect()
