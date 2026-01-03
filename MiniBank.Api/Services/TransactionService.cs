@@ -16,11 +16,14 @@ namespace MiniBank.Api.Services
 
         private readonly IEmailService _emailService;
 
-        public TransactionService(ITransactionRepository transactionRepo, IAccountRepository accountRepo, IEmailService emailService)
+        private readonly INotificationService _notificationService;
+
+        public TransactionService(ITransactionRepository transactionRepo, IAccountRepository accountRepo, IEmailService emailService, INotificationService notificationService)
         {
             _transactionRepo = transactionRepo;
             _accountRepo = accountRepo;
             _emailService = emailService;
+            _notificationService = notificationService;
         }
 
         public async Task<TransactionDto?> GetByIdAsync(int id)
@@ -75,13 +78,17 @@ namespace MiniBank.Api.Services
             };
 
             var createdTransaction = await _transactionRepo.CreateAsync(transaction);
+            var transactionDto = MapToDto(createdTransaction);
+            await _notificationService.NotifyTransactionAsync(account.AccountNumber, transactionDto);
+            await _notificationService.NotifyBalanceChangeAsync(account.AccountNumber, account.Balance);
+
             _ = _emailService.SendTransactionNotificationAsync(
                 toEmail: account.User.Email!,
                 transactionType: "Deposit",
                 amount: depositDto.Amount,
                 accountNumber: depositDto.AccountNumber
             );
-            return MapToDto(createdTransaction);
+            return transactionDto;
         }
 
         public async Task<TransactionDto> WithdrawAsync(WithdrawDto withdrawDto)

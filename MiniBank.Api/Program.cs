@@ -7,8 +7,12 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MiniBank.Api.Services;
+using MiniBank.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSignalR();
+
 
 builder.Services.AddControllers().AddNewtonsoftJson(options =>
 {
@@ -61,6 +65,7 @@ builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
@@ -79,6 +84,7 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHub<TransactionHub>("/hubs/transactions");
 
 app.MapControllers();
 
